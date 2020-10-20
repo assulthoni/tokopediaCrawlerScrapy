@@ -8,6 +8,8 @@ from scrapy import signals
 # useful for handling different item types with a single interface
 from itemadapter import is_item, ItemAdapter
 
+# selenium
+from selenium import webdriver
 
 class TokopediacrawlerSpiderMiddleware:
     # Not all methods need to be defined. If a method is not defined,
@@ -78,6 +80,7 @@ class TokopediacrawlerDownloaderMiddleware:
         # - or return a Request object
         # - or raise IgnoreRequest: process_exception() methods of
         #   installed downloader middleware will be called
+
         return None
 
     def process_response(self, request, response, spider):
@@ -101,3 +104,74 @@ class TokopediacrawlerDownloaderMiddleware:
 
     def spider_opened(self, spider):
         spider.logger.info('Spider opened: %s' % spider.name)
+
+class RotateAgentMiddleware(object):
+
+    def process_request(self, request, spider):
+         # webdriver setting
+        options = webdriver.ChromeOptions()
+        options.add_argument('--headless')
+
+        # webdriver request
+        driver = webdriver.Chrome(chrome_options=options,
+                                    executable_path="D:/kuliah/TUGAS AKHIR/SCRAPING TOKOPEDIA/chromedriver.exe"
+                                    )
+        driver.get("https://deviceatlas.com/blog/list-of-user-agent-strings")
+        time.sleep(1)
+
+        # real time random select user agent from website
+        agent_list = driver.find_elements_by_xpath("//td")
+        agent = (random.choice(agent_list)).text
+        loguru.logger.info("Hold Agent {agent}".format(agent=agent))
+        driver.quit()
+
+        # hold user agent
+        request.headers["User-Agent"] = agent
+
+class SeleniumMiddleware(object):
+
+    def process_request(self, request, spider):
+
+        # webdriver setting
+        options = webdriver.ChromeOptions()
+        options.add_argument('--proxy-server=%s' % request.meta["proxy"])
+        options.add_argument('--user-agent=%s' % request.headers["User-Agent"])
+
+        # webdriver request
+        driver = webdriver.Chrome(chrome_options=options,
+                                  executable_path="D:/kuliah/TUGAS AKHIR/SCRAPING TOKOPEDIA/chromedriver.exe"
+        )
+        driver.get(request.url)
+        time.sleep(10)
+
+        return scrapy.http.HtmlResponse(url=request.url,
+                                        status=200,
+                                        body=driver.page_source
+                                                   .encode("utf-8"),
+                                        encoding="utf-8")
+
+
+class TokopediaMiddleware(object):
+    def process_request(self, request, spider):
+        url = request.url
+        options = webdriver.ChromeOptions()
+        # options.add_argument('--headless')
+        # options.add_argument('--proxy-server=%s' % request.meta["proxy"])
+        # options.add_argument('--user-agent=%s' % request.headers["User-Agent"])
+
+        # webdriver request
+        driver = webdriver.Chrome(chrome_options=options,
+                                 executable_path="D:/kuliah/TUGAS AKHIR/SCRAPING TOKOPEDIA/chromedriver.exe"
+        )
+        driver.set_window_size(1440, 800)
+        driver.delete_all_cookies()
+        driver.get(url)
+
+        carousel_xpath = (
+            "//*[@id="zeus-root"]/div/div[2]/div/div[2]/div/div[2]/div[3]/div[2]/div[4]/div[1]",
+            
+        )
+        books = driver.find_elements_by_xpath(carousel_xpath)
+        for book in books:
+            print(book)
+
